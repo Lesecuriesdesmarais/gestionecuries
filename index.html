@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Écuries des Marais — Gestion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  const firebaseConfig = {
+    apiKey:"AIzaSyD7qDtSh0bpwvmloPToVV87UoJpam4j758",
+    authDomain:"ecuries-marais.firebaseapp.com",
+    projectId:"ecuries-marais",
+    storageBucket:"ecuries-marais.firebasestorage.app",
+    messagingSenderId:"393974380800",
+    appId:"1:393974380800:web:cc449d42670876058d9be5"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  window._db = db;
+  window._fbOps = { addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy };
+  window._col = (n) => collection(db, n||"cavaliers");
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<style>
+:root {
+  --pink:#E5007D; --violet:#4B0082; --pink-light:#fce8f3;
+  --bg:#f8f6f4; --surface:#fff; --border:#e8e4e0;
+  --text:#1a1714; --text-muted:#6b6460; --text-faint:#a09890;
+  --success-bg:#edf7f0; --success:#1e7e45;
+  --warn-bg:#fef9ec; --warn:#9a6e00;
+  --danger-bg:#fef0f0; --danger:#c0392b;
+  --info-bg:#eef4ff; --info:#1a56b0;
+  --radius:10px; --radius-sm:6px; --radius-lg:14px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 16px rgba(0,0,0,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+input,select,textarea{font-family:'DM Sans',sans-serif;font-size:13px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 11px;background:var(--surface);color:var(--text);width:100%;outline:none;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--pink);box-shadow:0 0 0 3px rgba(229,0,125,.08);}
+button{font-family:'DM Sans',sans-serif;cursor:pointer;}
+.app{display:flex;min-height:100vh;}
+/* SIDEBAR */
+.sidebar{width:224px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.sb-logo{padding:16px 14px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;}
+.sb-icon{width:34px;height:34px;border-radius:var(--radius-sm);background:var(--pink);display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;flex-shrink:0;}
+.sb-logo strong{font-size:12px;font-weight:600;display:block;line-height:1.3;}
+.sb-logo span{font-size:11px;color:var(--text-faint);}
+.sb-section{padding:10px 8px 2px;}
+.sb-label{font-size:10px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;padding:0 8px;margin-bottom:3px;}
+.nav-btn{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);border:none;background:transparent;width:100%;text-align:left;font-size:13px;color:var(--text-muted);transition:all .12s;margin-bottom:1px;}
+.nav-btn i{font-size:16px;}
+.nav-btn:hover{background:var(--bg);color:var(--text);}
+.nav-btn.active{background:var(--pink-light);color:var(--pink);font-weight:500;}
+.nb{margin-left:auto;font-size:11px;font-weight:600;padding:1px 6px;border-radius:100px;}
+.nb-danger{background:var(--danger-bg);color:var(--danger);}
+.nb-warn{background:var(--warn-bg);color:var(--warn);}
+.sb-footer{margin-top:auto;padding:10px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-faint);}
+/* MAIN */
+.main{flex:1;min-width:0;overflow-y:auto;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20;}
+.topbar h1{font-size:15px;font-weight:600;flex:1;}
+.content{padding:20px 24px;max-width:1200px;}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;border:none;transition:all .12s;white-space:nowrap;cursor:pointer;}
+.btn-primary{background:var(--pink);color:#fff;}.btn-primary:hover{background:#c8006e;}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border);}.btn-secondary:hover{background:var(--bg);}
+.btn-ghost{background:transparent;color:var(--text-muted);border:1px solid transparent;padding:6px 10px;}.btn-ghost:hover{background:var(--bg);color:var(--text);border-color:var(--border);}
+.btn-success{background:var(--success-bg);color:var(--success);}.btn-success:hover{background:#d4f0de;}
+.btn-danger{background:var(--danger-bg);color:var(--danger);}.btn-danger:hover{background:#fbd9d7;}
+.btn-warn{background:var(--warn-bg);color:var(--warn);}
+.btn-violet{background:#ede8f5;color:var(--violet);}.btn-violet:hover{background:#ddd6f0;}
+.btn-sm{padding:5px 10px;font-size:12px;} .btn-icon{padding:6px;}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow);}
+.card-title{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+.card-title i{color:var(--pink);}
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:11px;margin-bottom:18px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow);}
+.stat-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;}
+.stat-value{font-size:22px;font-weight:600;line-height:1;}
+.stat-sub{font-size:11px;color:var(--text-faint);margin-top:3px;}
+/* TABLE */
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;}
+.ttoolbar{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{background:var(--bg);text-align:left;padding:8px 13px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);}
+tbody td{padding:9px 13px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:#fafaf9;}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;}
+.badge-ok{background:var(--success-bg);color:var(--success);}
+.badge-partiel{background:var(--warn-bg);color:var(--warn);}
+.badge-impaye{background:var(--danger-bg);color:var(--danger);}
+.badge-info{background:var(--info-bg);color:var(--info);}
+.badge-pink{background:var(--pink-light);color:var(--pink);}
+.badge-gray{background:var(--bg);color:var(--text-muted);border:1px solid var(--border);}
+.badge-violet{background:#ede8f5;color:var(--violet);}
+/* AVATAR */
+.av{width:30px;height:30px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--pink);flex-shrink:0;}
+.av-lg{width:44px;height:44px;font-size:14px;}
+.av-fam{background:#ede8f5;color:var(--violet);}
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:12px;font-weight:500;color:var(--text-muted);}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fcol{grid-column:1/-1;}
+.fsep{grid-column:1/-1;border-top:1px solid var(--border);padding-top:13px;margin-top:2px;}
+.fsep-title{font-size:12px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px;color:var(--text-muted);}
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:100;align-items:center;justify-content:center;padding:14px;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--radius-lg);padding:22px;width:100%;max-width:660px;max-height:93vh;overflow-y:auto;box-shadow:var(--shadow-md);}
+.modal-sm{max-width:440px;}
+.mhead{display:flex;align-items:center;gap:9px;margin-bottom:18px;}
+.mtitle{font-size:14px;font-weight:600;flex:1;}
+.mfoot{display:flex;gap:7px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);}
+/* TABS */
+.tabbar{display:flex;gap:2px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px;margin-bottom:14px;}
+.tabbtn{flex:1;padding:6px;border:none;border-radius:4px;background:transparent;font-size:13px;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
+.tabbtn.active{background:var(--surface);color:var(--text);font-weight:500;box-shadow:var(--shadow);}
+/* SEARCH PANEL */
+.search-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;box-shadow:var(--shadow);}
+.search-main{display:flex;gap:8px;margin-bottom:12px;}
+.search-main input{font-size:14px;padding:10px 14px;}
+.filters-row{display:flex;gap:8px;flex-wrap:wrap;}
+.filters-row select{flex:1;min-width:140px;max-width:200px;}
+.filter-tag{display:inline-flex;align-items:center;gap:5px;background:var(--pink-light);color:var(--pink);border-radius:100px;padding:3px 10px;font-size:12px;font-weight:500;}
+.filter-tag button{background:none;border:none;color:var(--pink);cursor:pointer;font-size:14px;line-height:1;padding:0;}
+.search-results-info{font-size:12px;color:var(--text-faint);margin-top:8px;}
+/* ENCAISSEMENT */
+.enc-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.enc-row{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);}
+.enc-row.encaisse{background:var(--success-bg);border-color:#b2dfc0;}
+.enc-row.en-attente{background:var(--bg);}
+.enc-row.retard{background:var(--danger-bg);border-color:#f0b8b8;}
+.enc-row.rejete{background:#fff3f3;border-color:#f0c0c0;}
+/* COURS */
+.cours-pill{display:inline-flex;align-items:center;gap:5px;background:var(--info-bg);color:var(--info);border-radius:100px;padding:3px 9px;font-size:12px;font-weight:500;}
+/* FAMILLE */
+.fam-card{border:1.5px solid #ede8f5;border-radius:var(--radius-lg);padding:15px;margin-bottom:11px;background:var(--surface);}
+.fam-head{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
+.fam-membres{display:flex;flex-direction:column;gap:5px;}
+.fam-membre{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:var(--radius-sm);background:var(--bg);font-size:13px;}
+/* TARIFS DEGRESSIFS */
+.palier-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+.palier-row:last-child{border-bottom:none;}
+/* PROGRESS */
+.progress{height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:5px;}
+.progress-fill{height:100%;background:var(--pink);border-radius:3px;}
+/* RELANCES */
+.relance-item{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border);}
+.relance-item:last-child{border-bottom:none;}
+/* EMPTY */
+.empty{text-align:center;padding:32px 20px;color:var(--text-faint);}
+.empty i{font-size:30px;display:block;margin-bottom:6px;opacity:.4;}
+.empty p{font-size:13px;}
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;padding:10px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;box-shadow:var(--shadow-md);opacity:0;transform:translateY(6px);transition:all .22s;pointer-events:none;z-index:300;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast-ok{background:#1e7e45;color:#fff;}
+.toast-err{background:var(--danger);color:#fff;}
+.toast-warn{background:var(--warn);color:#fff;}
+/* QUICK INLINE INPUT */
+.quick-enc{display:flex;gap:6px;align-items:center;padding:7px 11px;background:var(--pink-light);border-radius:var(--radius-sm);margin-top:6px;}
+.quick-enc input,.quick-enc select{flex:1;min-width:80px;font-size:12px;padding:5px 8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{display:inline-block;animation:spin .8s linear infinite;}
+@media(max-width:640px){.sidebar{display:none;}.content{padding:12px;}.fgrid{grid-template-columns:1fr;}.fcol{grid-column:1;}.stats-row{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-icon">🐴</div>
+    <div><strong>Écuries des Marais</strong><span>Gestion</span></div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Principal</div>
+    <button class="nav-btn active" onclick="nav('dashboard',this)"><i class="ti ti-chart-bar"></i> Dashboard</button>
+    <button class="nav-btn" onclick="nav('recherche',this)"><i class="ti ti-search"></i> Recherche</button>
+    <button class="nav-btn" onclick="nav('cavaliers',this)"><i class="ti ti-horse"></i> Cavaliers</button>
+    <button class="nav-btn" onclick="nav('cours',this)"><i class="ti ti-calendar-week"></i> Cours</button>
+    <button class="nav-btn" onclick="nav('familles',this)"><i class="ti ti-users"></i> Familles</button>
+    <button class="nav-btn" onclick="nav('paiements',this)"><i class="ti ti-cash"></i> Paiements <span class="nb nb-danger" id="nb-imp" style="display:none">0</span></button>
+    <button class="nav-btn" onclick="nav('echeances',this)"><i class="ti ti-calendar-due"></i> Échéances <span class="nb nb-warn" id="nb-ech" style="display:none">0</span></button>
+    <button class="nav-btn" onclick="nav('relances',this)"><i class="ti ti-bell-ringing"></i> Relances <span class="nb nb-danger" id="nb-rel" style="display:none">0</span></button>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Outils</div>
+    <button class="nav-btn" onclick="nav('ai',this)"><i class="ti ti-sparkles"></i> Assistant IA</button>
+    <button class="nav-btn" onclick="nav('parametres',this)"><i class="ti ti-settings"></i> Paramètres</button>
+  </div>
+  <div class="sb-footer"><span id="db-status">⏳ Connexion...</span></div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <div style="display:flex;gap:7px;" id="topbar-btns">
+      <button class="btn btn-violet" onclick="openFamModal()"><i class="ti ti-users"></i> Famille</button>
+      <button class="btn btn-primary" onclick="openCavModal()"><i class="ti ti-plus"></i> Cavalier</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="v-dashboard">
+      <div class="stats-row" id="d-stats"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div class="card"><div class="card-title"><i class="ti ti-alert-circle"></i> Alertes</div><div id="d-alertes"></div></div>
+        <div class="card"><div class="card-title"><i class="ti ti-writing"></i> Chèques à encaisser (7j)</div><div id="d-cheques"></div></div>
+      </div>
+      <div class="card"><div class="card-title"><i class="ti ti-clock"></i> Derniers inscrits</div><div id="d-recent"></div></div>
+    </div>
+
+    <!-- RECHERCHE -->
+    <div id="v-recherche" style="display:none">
+      <div class="search-panel">
+        <div class="search-main">
+          <input type="text" id="rech-q" placeholder="🔍  Nom, prénom, email, téléphone..." oninput="doSearch()" style="flex:1">
+          <button class="btn btn-primary" onclick="doSearch()"><i class="ti ti-search"></i> Rechercher</button>
+        </div>
+        <div class="filters-row">
+          <select id="rf-statut" onchange="doSearch()"><option value="">Tous statuts paiement</option><option value="ok">✅ À jour</option><option value="partiel">⚠️ Partiel</option><option value="impayé">❌ Impayé</option></select>
+          <select id="rf-niveau" onchange="doSearch()"><option value="">Tous niveaux</option><option>Galop 1</option><option>Galop 2</option><option>Galop 3</option><option>Galop 4</option><option>Galop 5</option><option>Galop 6</option><option>Galop 7</option><option>Confirmé</option></select>
+          <select id="rf-jour" onchange="doSearch()"><option value="">Tous les jours</option><option>Lundi</option><option>Mardi</option><option>Mercredi</option><option>Jeudi</option><option>Vendredi</option><option>Samedi</option><option>Dimanche</option></select>
+          <select id="rf-formule" onchange="doSearch()"><option value="">Toutes formules</option><option value="650">1h — 650€</option><option value="1160">2h — 1160€</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="resetSearch()"><i class="ti ti-x"></i> Effacer</button>
+        </div>
+        <div class="search-results-info" id="rech-info"></div>
+      </div>
+      <div class="tcard"><table><thead><tr><th>Cavalier</th><th>Cours</th><th>Niveau</th><th>Famille</th><th>Montant dû</th><th>Encaissé</th><th>Statut</th><th></th></tr></thead>
+      <tbody id="rech-body"></tbody></table></div>
+    </div>
+
+    <!-- CAVALIERS -->
+    <div id="v-cavaliers" style="display:none">
+      <div class="tcard">
+        <div class="ttoolbar">
+          <input type="text" id="cav-q" placeholder="🔍 Rechercher..." oninput="renderCavs()" style="max-width:200px">
+          <select id="cav-fs" onchange="renderCavs()"><option value="">Tous statuts</option><option value="ok">À jour</option><option value="partiel">Partiel</option><option value="impayé">Impayé</option></select>
+          <select id="cav-fn" onchange="renderCavs()"><option value="">Tous niveaux</option><option>Galop 1</option><option>Galop 2</option><option>Galop 3</option><option>Galop 4</option><option>Galop 5</option><option>Galop 6</option><option>Galop 7</option><option>Confirmé</option></select>
+          <span id="cav-count" style="margin-left:auto;font-size:12px;color:var(--text-faint)"></span>
+        </div>
+        <table><thead><tr><th>Cavalier</th><th>Niveau</th><th>Cours</th><th>Famille</th><th>Total dû</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="cav-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- COURS -->
+    <div id="v-cours" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;" id="cours-jours-tabs"></div>
+      <div id="cours-content"></div>
+    </div>
+
+    <!-- FAMILLES -->
+    <div id="v-familles" style="display:none"><div id="fam-list"></div></div>
+
+    <!-- PAIEMENTS -->
+    <div id="v-paiements" style="display:none">
+      <div class="stats-row" id="pay-stats"></div>
+      <div class="tcard">
+        <div class="ttoolbar">
+          <select id="pay-fm" onchange="renderPay()"><option value="">Tous modes</option><option value="cheque">Chèque</option><option value="virement">Virement</option><option value="especes">Espèces</option><option value="mensuel">Mensuel</option></select>
+          <select id="pay-fs" onchange="renderPay()"><option value="">Tous statuts</option><option value="ok">À jour</option><option value="partiel">Partiel</option><option value="impayé">Impayé</option></select>
+        </div>
+        <table><thead><tr><th>Cavalier</th><th>Famille</th><th>Dû</th><th>Remise</th><th>Mode</th><th>Encaissé</th><th>Reste</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="pay-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ECHEANCES -->
+    <div id="v-echeances" style="display:none">
+      <div class="tabbar" id="ech-tabs">
+        <button class="tabbtn active" onclick="setEchTab('all',this)">Toutes</button>
+        <button class="tabbtn" onclick="setEchTab('cheque',this)">Chèques</button>
+        <button class="tabbtn" onclick="setEchTab('virement',this)">Virements</button>
+        <button class="tabbtn" onclick="setEchTab('mensuel',this)">Mensuel</button>
+        <button class="tabbtn" onclick="setEchTab('alerte',this)">⚠️ Alertes</button>
+      </div>
+      <div id="ech-list"></div>
+    </div>
+
+    <!-- RELANCES -->
+    <div id="v-relances" style="display:none">
+      <div class="card"><div class="card-title"><i class="ti ti-bell-ringing"></i> Cavaliers à relancer</div><div id="rel-list"></div></div>
+    </div>
+
+    <!-- AI -->
+    <div id="v-ai" style="display:none">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-sparkles"></i> Assistant IA</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Questions en français sur vos inscrits, paiements, cours...</p>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Qui n\'a pas encore payé ?')">Impayés</button>
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Quels chèques encaisser cette semaine ?')">Chèques semaine</button>
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Combien de cavaliers par jour de cours ?')">Par jour</button>
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Quel est le CA total et le montant encaissé ?')">CA total</button>
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Quelles familles ont une réduction ?')">Familles remisées</button>
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Qui monte le mercredi ?')">Mercredi</button>
+          <button class="btn btn-ghost btn-sm" onclick="askAI('Résume l\'état financier du club')">Résumé financier</button>
+        </div>
+        <div id="ai-msgs" style="display:flex;flex-direction:column;gap:9px;min-height:60px;max-height:300px;overflow-y:auto;margin-bottom:11px;">
+          <div style="padding:9px 13px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;line-height:1.6">Bonjour ! Je suis votre assistant. Posez-moi vos questions sur les inscrits.</div>
+        </div>
+        <div style="display:flex;gap:7px"><input type="text" id="ai-in" placeholder="Ex : Qui monte le samedi matin ?" onkeydown="if(event.key==='Enter')sendAI()"><button class="btn btn-primary" onclick="sendAI()"><i class="ti ti-send"></i></button></div>
+      </div>
+    </div>
+
+    <!-- PARAMETRES -->
+    <div id="v-parametres" style="display:none">
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title"><i class="ti ti-percentage"></i> Tarifs dégressifs famille</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Définissez les remises automatiques selon le rang de l'enfant dans une famille. Le 1er enfant est toujours à 100%.</p>
+        <div id="paliers-list"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="addPalier()"><i class="ti ti-plus"></i> Ajouter un palier</button>
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="savePaliers()"><i class="ti ti-check"></i> Enregistrer</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title"><i class="ti ti-calendar"></i> Créneaux de cours</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Définissez les créneaux disponibles pour les cavaliers.</p>
+        <div id="creneaux-list"></div>
+        <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+          <select id="new-cren-jour" style="flex:1;min-width:110px"><option>Lundi</option><option>Mardi</option><option>Mercredi</option><option>Jeudi</option><option>Vendredi</option><option>Samedi</option><option>Dimanche</option></select>
+          <input type="time" id="new-cren-heure" style="flex:1;min-width:90px" value="18:00">
+          <input type="text" id="new-cren-label" style="flex:2;min-width:120px" placeholder="Label (ex: Galop 1-2)">
+          <button class="btn btn-secondary btn-sm" onclick="addCreneau()"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-horse"></i> Saison en cours</div>
+        <div class="fg"><label>Saison</label><input type="text" id="param-saison" placeholder="2024/2025"></div>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveSaison()"><i class="ti ti-check"></i> Enregistrer</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- MODAL CAVALIER -->
+<div class="overlay" id="mo-cav" onclick="if(event.target===this)closeCavModal()">
+<div class="modal">
+  <div class="mhead"><div class="mtitle" id="mo-cav-title">Nouvel inscrit</div><button class="btn btn-ghost btn-icon" onclick="closeCavModal()"><i class="ti ti-x"></i></button></div>
+  <div class="tabbar">
+    <button class="tabbtn active" onclick="setFormTab('identite',this)">Identité</button>
+    <button class="tabbtn" onclick="setFormTab('cours',this)">Cours</button>
+    <button class="tabbtn" onclick="setFormTab('tarif',this)">Tarif</button>
+    <button class="tabbtn" onclick="setFormTab('urgence',this)">Urgence</button>
+  </div>
+  <!-- IDENTITE -->
+  <div id="ft-identite">
+    <div class="fgrid">
+      <div class="fg"><label>Nom *</label><input id="fc-nom" placeholder="Dupont"></div>
+      <div class="fg"><label>Prénom *</label><input id="fc-prenom" placeholder="Marie"></div>
+      <div class="fg"><label>Date de naissance</label><input id="fc-ddn" type="date"></div>
+      <div class="fg"><label>Email</label><input id="fc-email" type="email"></div>
+      <div class="fg"><label>Téléphone 1</label><input id="fc-tel1" type="tel"></div>
+      <div class="fg"><label>Téléphone 2</label><input id="fc-tel2" type="tel"></div>
+      <div class="fg fcol"><label>Adresse</label><input id="fc-adresse"></div>
+      <div class="fg fcol"><label>Famille</label><select id="fc-famille"><option value="">— Aucune —</option></select></div>
+      <div class="fg fcol"><label>Saison</label><input id="fc-saison" placeholder="2024/2025"></div>
+    </div>
+  </div>
+  <!-- COURS -->
+  <div id="ft-cours" style="display:none">
+    <div class="fgrid">
+      <div class="fg"><label>Jour du cours</label>
+        <select id="fc-jour"><option value="">— Choisir —</option><option>Lundi</option><option>Mardi</option><option>Mercredi</option><option>Jeudi</option><option>Vendredi</option><option>Samedi</option><option>Dimanche</option></select>
+      </div>
+      <div class="fg"><label>Heure</label><input id="fc-heure" type="time" value="18:00"></div>
+      <div class="fg"><label>Niveau du groupe</label>
+        <select id="fc-niveau"><option>Galop 1</option><option>Galop 2</option><option>Galop 3</option><option>Galop 4</option><option>Galop 5</option><option>Galop 6</option><option>Galop 7</option><option>Confirmé</option></select>
+      </div>
+      <div class="fg"><label>Créneau prédéfini (optionnel)</label><select id="fc-creneau-pre" onchange="fillCreneau()"><option value="">— Sélectionner —</option></select></div>
+      <div class="fg fcol"><label>Notes cours</label><input id="fc-cours-notes" placeholder="Ex : reprend après blessure, cavalier confirmé en CSO..."></div>
+    </div>
+  </div>
+  <!-- TARIF -->
+  <div id="ft-tarif" style="display:none">
+    <div class="fgrid">
+      <div class="fg"><label>Formule</label>
+        <select id="fc-formule" onchange="updateMontantBase()">
+          <option value="650">650€ — 1h/semaine</option>
+          <option value="1160">1160€ — 2h/semaine</option>
+          <option value="custom">Tarif personnalisé</option>
+        </select>
+      </div>
+      <div class="fg"><label>Montant de base (€)</label><input id="fc-mbase" type="number" value="650" oninput="updateTarifPreview()"></div>
+      <div class="fg"><label>Remise individuelle (€)</label><input id="fc-remise" type="number" value="0" oninput="updateTarifPreview()"></div>
+      <div class="fg"><label>Raison remise</label><input id="fc-remise-r" placeholder="Bénévolat, cas particulier..."></div>
+      <div class="fg fcol" id="fam-remise-info" style="display:none">
+        <div style="background:var(--success-bg);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--success)">
+          <i class="ti ti-users"></i> <span id="fam-remise-txt">Remise famille appliquée</span>
+        </div>
+      </div>
+      <div class="fg fcol">
+        <div style="background:var(--pink-light);border-radius:var(--radius-sm);padding:10px 13px;">
+          <span style="font-size:12px;color:var(--text-muted)">Montant final :</span>
+          <strong id="tarif-prev" style="color:var(--pink);font-size:17px;margin-left:8px">650 €</strong>
+          <span id="tarif-detail" style="font-size:12px;color:var(--text-faint);margin-left:4px"></span>
+        </div>
+      </div>
+      <div class="fg"><label>Licence FFE</label>
+        <select id="fc-licence"><option value="25">- 18 ans — 25€</option><option value="36">+ 18 ans — 36€</option></select>
+      </div>
+      <div class="fg"><label>Mode paiement</label>
+        <select id="fc-mode"><option value="cheque">Chèque(s)</option><option value="virement">Virement</option><option value="especes">Espèces</option><option value="mensuel">Mensuel</option></select>
+      </div>
+      <div class="fg"><label>Statut global</label>
+        <select id="fc-statut"><option value="impayé">Impayé</option><option value="partiel">Partiel</option><option value="ok">Payé</option></select>
+      </div>
+      <div class="fg fcol"><label>Notes paiement</label><input id="fc-pay-notes" placeholder="Informations complémentaires..."></div>
+    </div>
+  </div>
+  <!-- URGENCE -->
+  <div id="ft-urgence" style="display:none">
+    <div class="fgrid">
+      <div class="fg"><label>Nom</label><input id="fc-urg-nom"></div>
+      <div class="fg"><label>Prénom</label><input id="fc-urg-prenom"></div>
+      <div class="fg"><label>Téléphone</label><input id="fc-urg-tel" type="tel"></div>
+      <div class="fg"><label>Lien de parenté</label><input id="fc-urg-lien" placeholder="Mère, Père..."></div>
+    </div>
+  </div>
+  <div class="mfoot">
+    <button class="btn btn-primary" onclick="saveCav()">Enregistrer</button>
+    <button class="btn btn-secondary" onclick="closeCavModal()">Annuler</button>
+    <button class="btn btn-danger btn-sm" id="btn-del-cav" style="margin-left:auto;display:none" onclick="delCav()"><i class="ti ti-trash"></i></button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL FAMILLE -->
+<div class="overlay" id="mo-fam" onclick="if(event.target===this)closeFamModal()">
+<div class="modal modal-sm">
+  <div class="mhead"><div class="mtitle" id="mo-fam-title">Nouvelle famille</div><button class="btn btn-ghost btn-icon" onclick="closeFamModal()"><i class="ti ti-x"></i></button></div>
+  <div class="fgrid">
+    <div class="fg fcol"><label>Nom de la famille *</label><input id="ff-nom" placeholder="Famille Martin"></div>
+    <div class="fg"><label>Contact principal</label><input id="ff-contact"></div>
+    <div class="fg"><label>Téléphone</label><input id="ff-tel" type="tel"></div>
+    <div class="fg fcol"><label>Email</label><input id="ff-email" type="email"></div>
+    <div class="fg fcol" style="padding:10px;background:var(--info-bg);border-radius:var(--radius-sm);font-size:12px;color:var(--info)">
+      <i class="ti ti-info-circle"></i> Les remises sont calculées automatiquement selon les paliers dégressifs définis dans Paramètres. Vous pouvez aussi ajouter une remise manuelle.
+    </div>
+    <div class="fg"><label>Remise manuelle supplémentaire (€)</label><input id="ff-remise" type="number" value="0"></div>
+    <div class="fg"><label>Raison</label><input id="ff-remise-r" placeholder="Ex: Bénévolat, cas social..."></div>
+    <div class="fg fcol"><label>Notes</label><input id="ff-notes"></div>
+  </div>
+  <div class="mfoot">
+    <button class="btn btn-primary" onclick="saveFam()">Enregistrer</button>
+    <button class="btn btn-secondary" onclick="closeFamModal()">Annuler</button>
+    <button class="btn btn-danger btn-sm" id="btn-del-fam" style="margin-left:auto;display:none" onclick="delFam()"><i class="ti ti-trash"></i></button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL ENCAISSEMENT -->
+<div class="overlay" id="mo-enc" onclick="if(event.target===this)closeEncModal()">
+<div class="modal modal-sm">
+  <div class="mhead"><div class="mtitle" id="mo-enc-title">Ajouter un encaissement</div><button class="btn btn-ghost btn-icon" onclick="closeEncModal()"><i class="ti ti-x"></i></button></div>
+  <div class="fgrid">
+    <div class="fg"><label>Montant (€) *</label><input id="enc-montant" type="number" placeholder="0"></div>
+    <div class="fg"><label>Date *</label><input id="enc-date" type="date"></div>
+    <div class="fg"><label>Mode</label>
+      <select id="enc-mode"><option value="cheque">Chèque</option><option value="virement">Virement</option><option value="especes">Espèces</option><option value="mensuel">Mensuel</option></select>
+    </div>
+    <div class="fg"><label>Statut</label>
+      <select id="enc-statut"><option value="encaisse">Encaissé ✓</option><option value="en-attente">En attente</option><option value="retard">En retard</option><option value="rejete">Rejeté</option></select>
+    </div>
+    <div class="fg fcol"><label>Référence (N° chèque, ref virement...)</label><input id="enc-ref" placeholder="Ex: 1234567"></div>
+    <div class="fg fcol"><label>Note</label><input id="enc-note" placeholder="Remarque..."></div>
+  </div>
+  <div class="mfoot">
+    <button class="btn btn-primary" onclick="saveEnc()">Enregistrer</button>
+    <button class="btn btn-secondary" onclick="closeEncModal()">Annuler</button>
+    <button class="btn btn-danger btn-sm" id="btn-del-enc" style="margin-left:auto;display:none" onclick="delEnc()"><i class="ti ti-trash"></i></button>
+  </div>
+</div>
+</div>
+
+<!-- DETAIL CAVALIER -->
+<div class="overlay" id="mo-detail" onclick="if(event.target===this)closeDetail()">
+<div class="modal" style="max-width:580px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <div class="mtitle" id="det-name">Fiche cavalier</div>
+    <button class="btn btn-ghost btn-sm" id="det-edit-btn"><i class="ti ti-edit"></i> Modifier</button>
+    <button class="btn btn-ghost btn-icon" onclick="closeDetail()" style="margin-left:auto"><i class="ti ti-x"></i></button>
+  </div>
+  <div id="det-content"></div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+let cavaliers=[], familles=[], settings={paliers:[{rang:2,pct:10},{rang:3,pct:20}], creneaux:[], saison:'2024/2025'};
+let editCavId=null, editFamId=null, encCavId=null, encIdx=null;
+let currentView='dashboard', echTab='all', coursDayTab='';
+let db, fbOps;
+
+// ===== FIREBASE =====
+window.addEventListener('firebase-ready', () => {
+  db=window._db; fbOps=window._fbOps;
+  listen('cavaliers', snap => { cavaliers=snap.docs.map(d=>({id:d.id,...d.data()})); refreshAll(); document.getElementById('db-status').textContent='🟢 Firebase'; });
+  listen('familles', snap => { familles=snap.docs.map(d=>({id:d.id,...d.data()})); refreshAll(); populateFamSel(); });
+  listen('settings', snap => { if(snap.docs.length) settings={...settings,...snap.docs[0].data(),_id:snap.docs[0].id}; renderPaliers(); renderCreneaux(); document.getElementById('param-saison').value=settings.saison||''; });
+});
+
+function listen(col, cb) {
+  const q=fbOps.query(window._col(col),fbOps.orderBy('createdAt','desc'));
+  fbOps.onSnapshot(q, cb, err=>{ document.getElementById('db-status').textContent='🔴 Erreur'; console.error(err); });
+}
+
+// ===== HELPERS =====
+const today=()=>new Date().toISOString().split('T')[0];
+const ini=(n,p)=>((p||'?')[0]+(n||'?')[0]).toUpperCase();
+const fmt=(s)=>s?new Date(s).toLocaleDateString('fr-FR'):'—';
+const fmtM=(n)=>Number(n||0).toLocaleString('fr-FR')+' €';
+const daysDiff=(s)=>s?Math.round((new Date(s)-new Date())/86400000):999;
+const getAge=(d)=>{if(!d)return null;const a=new Date(),b=new Date(d);let ag=a.getFullYear()-b.getFullYear();if(a<new Date(a.getFullYear(),b.getMonth(),b.getDate()))ag--;return ag;};
+
+function getRemiseFamille(c) {
+  const fam = familles.find(f=>f.id===c.familleId);
+  if (!fam) return 0;
+  const membres = cavaliers.filter(x=>x.familleId===c.familleId).sort((a,b)=>(a.createdAt||0)>(b.createdAt||0)?1:-1);
+  const rang = membres.findIndex(x=>x.id===c.id)+1 || 1;
+  let remisePct = 0;
+  (settings.paliers||[]).forEach(p=>{ if(rang>=p.rang && p.pct>remisePct) remisePct=p.pct; });
+  const base = parseInt(c.montantBase||c.formule||650);
+  return Math.round(base * remisePct / 100) + parseInt(fam.remise||0);
+}
+
+function getMontantDu(c) {
+  const base=parseInt(c.montantBase||c.formule||650);
+  const remInd=parseInt(c.remise||0);
+  const remFam=getRemiseFamille(c);
+  return Math.max(0, base-remInd-remFam);
+}
+
+function getEncaisse(c) {
+  return (c.encaissements||[]).filter(e=>e.statut==='encaisse').reduce((s,e)=>s+Number(e.montant||0),0);
+}
+function getReste(c){ return Math.max(0,getMontantDu(c)-getEncaisse(c)); }
+
+function computeStatut(c) {
+  const enc=getEncaisse(c), du=getMontantDu(c);
+  if(enc>=du && du>0) return 'ok';
+  if(enc>0) return 'partiel';
+  return 'impayé';
+}
+
+function statBadge(s) {
+  const m={ok:'<span class="badge badge-ok"><i class="ti ti-check" style="font-size:10px"></i> À jour</span>',partiel:'<span class="badge badge-partiel"><i class="ti ti-clock" style="font-size:10px"></i> Partiel</span>',impayé:'<span class="badge badge-impaye"><i class="ti ti-x" style="font-size:10px"></i> Impayé</span>'};
+  return m[s]||`<span class="badge badge-gray">${s}</span>`;
+}
+function modeBadge(m) {
+  const map={cheque:'<span class="badge badge-violet"><i class="ti ti-writing" style="font-size:10px"></i> Chèque</span>',virement:'<span class="badge badge-info"><i class="ti ti-building-bank" style="font-size:10px"></i> Virement</span>',especes:'<span class="badge badge-gray"><i class="ti ti-coins" style="font-size:10px"></i> Espèces</span>',mensuel:'<span class="badge badge-pink"><i class="ti ti-calendar-repeat" style="font-size:10px"></i> Mensuel</span>'};
+  return map[m]||`<span class="badge badge-gray">${m||'—'}</span>`;
+}
+function encStatBadge(s) {
+  const m={encaisse:'<span class="badge badge-ok">Encaissé</span>','en-attente':'<span class="badge badge-gray">En attente</span>',retard:'<span class="badge badge-impaye">En retard</span>',rejete:'<span class="badge badge-impaye">Rejeté</span>'};
+  return m[s]||`<span class="badge badge-gray">${s}</span>`;
+}
+function coursPill(c) {
+  if(!c.jour) return '<span style="color:var(--text-faint);font-size:12px">—</span>';
+  return `<span class="cours-pill"><i class="ti ti-clock" style="font-size:10px"></i> ${c.jour} ${c.heure||''}</span>`;
+}
+
+function refreshAll() {
+  updateBadges();
+  const v=currentView;
+  if(v==='dashboard') renderDashboard();
+  else if(v==='recherche') doSearch();
+  else if(v==='cavaliers') renderCavs();
+  else if(v==='cours') renderCours();
+  else if(v==='familles') renderFamilles();
+  else if(v==='paiements') renderPay();
+  else if(v==='echeances') renderEch();
+  else if(v==='relances') renderRelances();
+}
+
+function updateBadges() {
+  const imp=cavaliers.filter(c=>c.statut==='impayé'||c.statut==='partiel').length;
+  setBadge('nb-imp',imp);
+  const enc_alertes=getAllEncs().filter(e=>{const d=daysDiff(e.datePrevu||e.date);return(e.statut==='en-attente'&&d>=0&&d<=7)||e.statut==='retard';}).length;
+  setBadge('nb-ech',enc_alertes);
+  const rel=cavaliers.filter(c=>needsRelance(c)).length;
+  setBadge('nb-rel',rel);
+}
+function setBadge(id,n){const el=document.getElementById(id);if(el){el.textContent=n;el.style.display=n?'':'none';}}
+
+function getAllEncs() {
+  const res=[];
+  cavaliers.forEach(c=>{(c.encaissements||[]).forEach((e,i)=>res.push({...e,cavId:c.id,cavNom:c.nom,cavPrenom:c.prenom,encIdx:i}));});
+  return res;
+}
+
+function needsRelance(c) {
+  if(c.statut==='impayé') return true;
+  if(c.statut==='partiel') return (c.encaissements||[]).some(e=>e.statut==='retard'||e.statut==='rejete');
+  return false;
+}
+
+// ===== NAVIGATION =====
+function nav(view, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  currentView=view;
+  const titles={dashboard:'Dashboard',recherche:'Recherche avancée',cavaliers:'Cavaliers',cours:'Cours & créneaux',familles:'Familles',paiements:'Paiements',echeances:'Échéances & encaissements',relances:'Relances',ai:'Assistant IA',parametres:'Paramètres'};
+  document.getElementById('page-title').textContent=titles[view]||'';
+  ['dashboard','recherche','cavaliers','cours','familles','paiements','echeances','relances','ai','parametres'].forEach(v=>{
+    document.getElementById('v-'+v).style.display=v===view?'':'none';
+  });
+  refreshAll();
+}
+
+// ===== DASHBOARD =====
+function renderDashboard() {
+  const total=cavaliers.length;
+  const du=cavaliers.reduce((s,c)=>s+getMontantDu(c),0);
+  const enc=cavaliers.reduce((s,c)=>s+getEncaisse(c),0);
+  const imp=cavaliers.filter(c=>c.statut==='impayé').length;
+  const ok=cavaliers.filter(c=>c.statut==='ok').length;
+  document.getElementById('d-stats').innerHTML=`
+    <div class="stat"><div class="stat-label">Cavaliers</div><div class="stat-value">${total}</div><div class="stat-sub">${familles.length} famille(s)</div></div>
+    <div class="stat"><div class="stat-label">Total dû</div><div class="stat-value" style="font-size:18px">${fmtM(du)}</div></div>
+    <div class="stat"><div class="stat-label">Encaissé</div><div class="stat-value" style="color:var(--success);font-size:18px">${fmtM(enc)}</div><div class="progress"><div class="progress-fill" style="width:${du?Math.round(enc/du*100):0}%"></div></div></div>
+    <div class="stat"><div class="stat-label">Reste</div><div class="stat-value" style="color:var(--danger);font-size:18px">${fmtM(du-enc)}</div></div>
+    <div class="stat"><div class="stat-label">Impayés / OK</div><div class="stat-value" style="font-size:16px"><span style="color:var(--danger)">${imp}</span> / <span style="color:var(--success)">${ok}</span></div></div>
+  `;
+  // Alertes
+  const alertes=[];
+  cavaliers.forEach(c=>(c.encaissements||[]).forEach((e,i)=>{
+    const d=daysDiff(e.date);
+    if(e.statut==='retard'||e.statut==='rejete') alertes.push({c,e,i,type:e.statut});
+    else if(e.statut==='en-attente'&&d>=0&&d<=7) alertes.push({c,e,i,type:'alerte',d});
+  }));
+  document.getElementById('d-alertes').innerHTML=alertes.length?alertes.slice(0,5).map(a=>`
+    <div class="relance-item">
+      <div class="av">${ini(a.c.nom,a.c.prenom)}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${a.c.prenom} ${a.c.nom}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${fmtM(a.e.montant)} — ${fmt(a.e.date)} ${a.e.ref?'· '+a.e.ref:''}</div></div>
+      ${a.type==='alerte'?`<span class="badge badge-partiel">J-${a.d}</span>`:encStatBadge(a.type)}
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="openEncModal('${a.c.id}',${a.i})"><i class="ti ti-edit"></i></button>
+    </div>`).join(''):'<div class="empty"><i class="ti ti-circle-check"></i><p>Aucune alerte</p></div>';
+
+  // Chèques J7
+  const cheques=getAllEncs().filter(e=>e.mode==='cheque'&&e.statut==='en-attente'&&daysDiff(e.date)>=0&&daysDiff(e.date)<=7).sort((a,b)=>a.date>b.date?1:-1);
+  document.getElementById('d-cheques').innerHTML=cheques.length?cheques.map(e=>`
+    <div class="relance-item">
+      <div class="av">${ini(e.cavNom,e.cavPrenom)}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${e.cavPrenom} ${e.cavNom}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${e.ref||'Sans référence'} — ${fmtM(e.montant)}</div></div>
+      <span class="badge badge-partiel">J-${daysDiff(e.date)}</span>
+      <button class="btn btn-success btn-sm" onclick="encaisserVite('${e.cavId}',${e.encIdx})"><i class="ti ti-check"></i></button>
+    </div>`).join(''):'<div class="empty"><i class="ti ti-checks"></i><p>Aucun chèque J-7</p></div>';
+
+  document.getElementById('d-recent').innerHTML=cavaliers.slice(0,5).map(c=>`
+    <div class="relance-item" style="cursor:pointer" onclick="openDetail('${c.id}')">
+      <div class="av">${ini(c.nom,c.prenom)}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${c.prenom} ${c.nom}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${c.niveau||'—'} ${c.jour?'· '+c.jour+' '+(c.heure||''):''}</div></div>
+      ${statBadge(c.statut)}
+    </div>`).join('')||'<div class="empty"><i class="ti ti-horse"></i><p>Aucun cavalier</p></div>';
+}
+
+// ===== RECHERCHE =====
+function doSearch() {
+  const q=(document.getElementById('rech-q')?.value||'').toLowerCase().trim();
+  const fs=document.getElementById('rf-statut')?.value||'';
+  const fn=document.getElementById('rf-niveau')?.value||'';
+  const fj=document.getElementById('rf-jour')?.value||'';
+  const ff=document.getElementById('rf-formule')?.value||'';
+  const filtered=cavaliers.filter(c=>{
+    const txt=`${c.nom} ${c.prenom} ${c.email||''} ${c.tel1||''} ${c.tel2||''} ${c.adresse||''}`.toLowerCase();
+    return (!q||txt.includes(q))&&(!fs||c.statut===fs)&&(!fn||c.niveau===fn)&&(!fj||c.jour===fj)&&(!ff||c.formule===ff);
+  });
+  document.getElementById('rech-info').textContent=q||fs||fn||fj||ff?`${filtered.length} résultat${filtered.length>1?'s':''} trouvé${filtered.length>1?'s':''}${q?' pour "'+q+'"':''}`:filtrerInfo(filtered.length);
+  document.getElementById('rech-body').innerHTML=filtered.length?filtered.map(c=>{
+    const fam=familles.find(f=>f.id===c.familleId);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av">${ini(c.nom,c.prenom)}</div><div><div style="font-weight:500">${c.prenom} ${c.nom}</div><div style="font-size:11px;color:var(--text-faint)">${c.email||''}</div></div></div></td>
+      <td>${coursPill(c)}</td>
+      <td><span class="badge badge-pink">${c.niveau||'—'}</span></td>
+      <td>${fam?`<span class="badge badge-violet">${fam.nom}</span>`:'—'}</td>
+      <td style="font-weight:500">${fmtM(getMontantDu(c))}</td>
+      <td style="color:var(--success)">${fmtM(getEncaisse(c))}</td>
+      <td>${statBadge(c.statut)}</td>
+      <td><div style="display:flex;gap:3px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openDetail('${c.id}')"><i class="ti ti-eye"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditCav('${c.id}')"><i class="ti ti-edit"></i></button>
+      </div></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="8" class="empty"><i class="ti ti-search"></i><p>Aucun résultat</p></td></tr>`;
+}
+
+function filtrerInfo(n) { return `${n} cavalier${n>1?'s':''} au total`; }
+function resetSearch() {
+  ['rech-q','rf-statut','rf-niveau','rf-jour','rf-formule'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  doSearch();
+}
+
+// ===== CAVALIERS =====
+function renderCavs() {
+  const q=(document.getElementById('cav-q')?.value||'').toLowerCase();
+  const fs=document.getElementById('cav-fs')?.value||'';
+  const fn=document.getElementById('cav-fn')?.value||'';
+  const filtered=cavaliers.filter(c=>(!q||`${c.nom} ${c.prenom}`.toLowerCase().includes(q))&&(!fs||c.statut===fs)&&(!fn||c.niveau===fn));
+  document.getElementById('cav-count').textContent=`${filtered.length} cavalier${filtered.length>1?'s':''}`;
+  document.getElementById('cav-body').innerHTML=filtered.length?filtered.map(c=>{
+    const fam=familles.find(f=>f.id===c.familleId);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av">${ini(c.nom,c.prenom)}</div><div><div style="font-weight:500">${c.prenom} ${c.nom}</div><div style="font-size:11px;color:var(--text-faint)">${c.email||''}</div></div></div></td>
+      <td><span class="badge badge-pink">${c.niveau||'—'}</span></td>
+      <td>${coursPill(c)}</td>
+      <td>${fam?`<span class="badge badge-violet">${fam.nom}</span>`:'—'}</td>
+      <td>${fmtM(getMontantDu(c))}</td>
+      <td>${statBadge(c.statut)}</td>
+      <td><div style="display:flex;gap:3px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openDetail('${c.id}')"><i class="ti ti-eye"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditCav('${c.id}')"><i class="ti ti-edit"></i></button>
+      </div></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="7" class="empty"><i class="ti ti-search"></i><p>Aucun résultat</p></td></tr>`;
+}
+
+// ===== COURS =====
+function renderCours() {
+  const jours=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+  const joursDispo=[...new Set(cavaliers.filter(c=>c.jour).map(c=>c.jour))].sort((a,b)=>jours.indexOf(a)-jours.indexOf(b));
+  if(!joursDispo.length){document.getElementById('cours-jours-tabs').innerHTML='';document.getElementById('cours-content').innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Aucun cavalier avec un jour de cours défini</p></div>';return;}
+  if(!coursDayTab||!joursDispo.includes(coursDayTab)) coursDayTab=joursDispo[0];
+  document.getElementById('cours-jours-tabs').innerHTML=joursDispo.map(j=>`<button class="btn ${j===coursDayTab?'btn-primary':'btn-secondary'}" onclick="setCourDay('${j}')">${j}</button>`).join('');
+  const du_jour=cavaliers.filter(c=>c.jour===coursDayTab).sort((a,b)=>(a.heure||'')>(b.heure||'')?1:-1);
+  // Group by heure
+  const groupes={};
+  du_jour.forEach(c=>{const k=(c.heure||'Sans heure');if(!groupes[k])groupes[k]=[];groupes[k].push(c);});
+  document.getElementById('cours-content').innerHTML=Object.entries(groupes).map(([h,cavs])=>`
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title"><i class="ti ti-clock"></i> ${coursDayTab} ${h} — <span style="color:var(--text-muted);font-weight:400">${cavs.length} cavalier${cavs.length>1?'s':''}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
+        ${cavs.map(c=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;background:var(--surface)" onclick="openDetail('${c.id}')">
+            <div class="av">${ini(c.nom,c.prenom)}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:500;font-size:13px">${c.prenom} ${c.nom}</div>
+              <div style="font-size:11px;color:var(--text-faint)">${c.niveau||'—'}</div>
+            </div>
+            ${statBadge(c.statut)}
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function setCourDay(j){coursDayTab=j;renderCours();}
+
+// ===== FAMILLES =====
+function renderFamilles() {
+  if(!familles.length){document.getElementById('fam-list').innerHTML='<div class="empty"><i class="ti ti-users"></i><p>Aucune famille<br><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openFamModal()">Créer une famille</button></p></div>';return;}
+  document.getElementById('fam-list').innerHTML=familles.map(fam=>{
+    const membres=cavaliers.filter(c=>c.familleId===fam.id).sort((a,b)=>(a.createdAt||0)>(b.createdAt||0)?1:-1);
+    const totalDu=membres.reduce((s,c)=>s+getMontantDu(c),0);
+    const totalEnc=membres.reduce((s,c)=>s+getEncaisse(c),0);
+    // Paliers résumé
+    let palierDesc='';
+    if(settings.paliers&&settings.paliers.length){
+      palierDesc=settings.paliers.map(p=>`${p.rang}ème enfant : -${p.pct}%`).join(', ');
+    }
+    return `<div class="fam-card">
+      <div class="fam-head">
+        <div class="av av-lg av-fam"><i class="ti ti-users" style="font-size:16px"></i></div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:600">${fam.nom}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${fam.contact||''} ${fam.tel?'· '+fam.tel:''}</div>
+          ${palierDesc?`<div style="font-size:11px;color:var(--info);margin-top:2px"><i class="ti ti-percentage" style="font-size:10px"></i> ${palierDesc}</div>`:''}
+          ${parseInt(fam.remise||0)>0?`<div style="font-size:11px;color:var(--success)">+ remise manuelle ${fam.remise}€ (${fam.remiseRaison||''})</div>`:''}
+        </div>
+        <div style="text-align:right;font-size:13px">
+          <div style="font-weight:600">${fmtM(totalEnc)} / ${fmtM(totalDu)}</div>
+          <div style="font-size:11px;color:var(--text-faint)">encaissé</div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditFam('${fam.id}')"><i class="ti ti-edit"></i></button>
+      </div>
+      <div class="fam-membres">${membres.length?membres.map((c,idx)=>{
+        const remiseAuto=getRemiseFamille(c)-parseInt(familles.find(f=>f.id===c.familleId)?.remise||0);
+        return `<div class="fam-membre">
+          <div style="background:var(--pink-light);color:var(--pink);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${idx+1}</div>
+          <div class="av" style="width:26px;height:26px;font-size:10px">${ini(c.nom,c.prenom)}</div>
+          <div style="flex:1"><span style="font-weight:500">${c.prenom} ${c.nom}</span> <span style="font-size:12px;color:var(--text-faint)">· ${c.niveau||'—'}</span></div>
+          ${idx>0&&remiseAuto>0?`<span class="badge badge-ok" style="font-size:10px">-${remiseAuto}€</span>`:''}
+          ${statBadge(c.statut)}
+          <span style="font-size:12px;font-weight:500">${fmtM(getMontantDu(c))}</span>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openDetail('${c.id}')"><i class="ti ti-eye"></i></button>
+        </div>`;
+      }).join(''):'<div style="font-size:13px;color:var(--text-faint);padding:4px 0">Aucun cavalier lié.</div>'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ===== PAIEMENTS =====
+function renderPay() {
+  const fm=document.getElementById('pay-fm')?.value||'';
+  const fs=document.getElementById('pay-fs')?.value||'';
+  const filtered=cavaliers.filter(c=>(!fm||c.mode===fm)&&(!fs||c.statut===fs));
+  const totalDu=cavaliers.reduce((s,c)=>s+getMontantDu(c),0);
+  const totalEnc=cavaliers.reduce((s,c)=>s+getEncaisse(c),0);
+  const ok=cavaliers.filter(c=>c.statut==='ok').length, part=cavaliers.filter(c=>c.statut==='partiel').length, imp=cavaliers.filter(c=>c.statut==='impayé').length;
+  document.getElementById('pay-stats').innerHTML=`
+    <div class="stat"><div class="stat-label">Total dû</div><div class="stat-value" style="font-size:18px">${fmtM(totalDu)}</div></div>
+    <div class="stat"><div class="stat-label">Encaissé</div><div class="stat-value" style="color:var(--success);font-size:18px">${fmtM(totalEnc)}</div></div>
+    <div class="stat"><div class="stat-label">Reste</div><div class="stat-value" style="color:var(--danger);font-size:18px">${fmtM(totalDu-totalEnc)}</div></div>
+    <div class="stat"><div class="stat-label">OK / Partiel / Impayé</div><div class="stat-value" style="font-size:15px"><span style="color:var(--success)">${ok}</span> / <span style="color:var(--warn)">${part}</span> / <span style="color:var(--danger)">${imp}</span></div></div>
+  `;
+  document.getElementById('pay-body').innerHTML=filtered.length?filtered.map(c=>{
+    const fam=familles.find(f=>f.id===c.familleId);
+    const remTotal=parseInt(c.remise||0)+getRemiseFamille(c);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av">${ini(c.nom,c.prenom)}</div>${c.prenom} ${c.nom}</div></td>
+      <td>${fam?`<span style="font-size:12px;color:var(--violet)">${fam.nom}</span>`:'—'}</td>
+      <td style="font-weight:500">${fmtM(parseInt(c.montantBase||c.formule||650))}</td>
+      <td>${remTotal>0?`<span style="color:var(--success)">-${remTotal}€</span>`:'—'}</td>
+      <td>${modeBadge(c.mode)}</td>
+      <td style="color:var(--success);font-weight:500">${fmtM(getEncaisse(c))}</td>
+      <td style="font-weight:500;color:${getReste(c)>0?'var(--danger)':'var(--success)'}">${fmtM(getReste(c))}</td>
+      <td>${statBadge(c.statut)}</td>
+      <td><div style="display:flex;gap:3px">
+        <button class="btn btn-success btn-sm btn-icon" onclick="openEncModal('${c.id}',null)" title="Ajouter encaissement"><i class="ti ti-plus"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openDetail('${c.id}')"><i class="ti ti-eye"></i></button>
+      </div></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="9" class="empty"><p>Aucune donnée</p></td></tr>`;
+}
+
+// ===== ECHEANCES =====
+function setEchTab(tab,btn){
+  echTab=tab;
+  document.querySelectorAll('#ech-tabs .tabbtn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderEch();
+}
+
+function renderEch() {
+  let all=getAllEncs();
+  if(echTab==='cheque') all=all.filter(e=>e.mode==='cheque');
+  else if(echTab==='virement') all=all.filter(e=>e.mode==='virement');
+  else if(echTab==='mensuel') all=all.filter(e=>e.mode==='mensuel');
+  else if(echTab==='alerte') all=all.filter(e=>e.statut==='retard'||e.statut==='rejete'||(e.statut==='en-attente'&&daysDiff(e.date)>=0&&daysDiff(e.date)<=7));
+  all.sort((a,b)=>(a.date||'')>(b.date||'')?1:-1);
+  if(!all.length){document.getElementById('ech-list').innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Aucune échéance</p></div>';return;}
+  const groups={};
+  all.forEach(e=>{const k=(e.date||'').substring(0,7)||'sans-date';if(!groups[k])groups[k]=[];groups[k].push(e);});
+  document.getElementById('ech-list').innerHTML=Object.entries(groups).map(([m,echs])=>{
+    const label=m==='sans-date'?'Sans date':new Date(m+'-01').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+    return `<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">${label}</div>
+      ${echs.map(e=>{
+        const d=daysDiff(e.date);
+        const cls=e.statut==='encaisse'?'encaisse':e.statut==='retard'||e.statut==='rejete'?'retard':(e.statut==='en-attente'&&d>=0&&d<=7)?'en-attente':e.statut==='en-attente'?'en-attente':'';
+        return `<div class="enc-row ${cls}" style="margin-bottom:5px">
+          ${modeBadge(e.mode)}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${e.cavPrenom} ${e.cavNom}</div>
+            <div style="font-size:11px;color:var(--text-faint)">${fmt(e.date)} ${e.ref?'· '+e.ref:''} ${e.note?'· '+e.note:''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-weight:600;font-size:13px">${fmtM(e.montant)}</div>
+            <div style="margin-top:2px">${(e.statut==='en-attente'&&d>=0&&d<=7)?`<span class="badge badge-partiel">J-${d}</span>`:encStatBadge(e.statut)}</div>
+          </div>
+          <div style="display:flex;gap:3px;flex-shrink:0">
+            ${e.statut!=='encaisse'?`<button class="btn btn-success btn-sm btn-icon" title="Encaisser" onclick="encaisserVite('${e.cavId}',${e.encIdx})"><i class="ti ti-check"></i></button>`:''}
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="openEncModal('${e.cavId}',${e.encIdx})"><i class="ti ti-edit"></i></button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ===== RELANCES =====
+function renderRelances() {
+  const toRel=cavaliers.filter(c=>needsRelance(c));
+  document.getElementById('rel-list').innerHTML=toRel.length?toRel.map(c=>`
+    <div class="relance-item">
+      <div class="av">${ini(c.nom,c.prenom)}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">${c.prenom} ${c.nom}</div>
+        <div style="font-size:12px;color:var(--text-faint)">${c.tel1||'—'} ${c.email?'· '+c.email:''}</div>
+        ${(c.encaissements||[]).filter(e=>e.statut==='retard'||e.statut==='rejete').length?`<div style="font-size:11px;color:var(--danger);margin-top:1px">${(c.encaissements||[]).filter(e=>e.statut==='retard'||e.statut==='rejete').length} encaissement(s) en retard/rejeté(s)</div>`:''}
+      </div>
+      ${statBadge(c.statut)}
+      <div style="text-align:right;flex-shrink:0"><div style="font-weight:600;color:var(--danger)">${fmtM(getReste(c))}</div><div style="font-size:11px;color:var(--text-faint)">restant dû</div></div>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="openDetail('${c.id}')"><i class="ti ti-eye"></i></button>
+    </div>`).join(''):'<div class="empty"><i class="ti ti-circle-check"></i><p>Aucune relance nécessaire</p></div>';
+}
+
+// ===== PARAMETRES =====
+function renderPaliers() {
+  const paliers=settings.paliers||[];
+  document.getElementById('paliers-list').innerHTML=`
+    <div class="palier-row" style="font-size:12px;color:var(--text-muted);font-weight:600">
+      <div style="flex:1">1er enfant</div><div style="color:var(--success)">100% (plein tarif)</div>
+    </div>
+    ${paliers.map((p,i)=>`<div class="palier-row">
+      <div style="flex:1;font-size:13px">${p.rang}ème enfant et au-delà</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="number" value="${p.pct}" min="0" max="100" style="width:70px" oninput="settings.paliers[${i}].pct=parseInt(this.value)||0">
+        <span style="font-size:13px;color:var(--text-muted)">% de remise</span>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="removePalier(${i})"><i class="ti ti-trash" style="color:var(--danger)"></i></button>
+      </div>
+    </div>`).join('')}
+  `;
+}
+
+function addPalier() {
+  const lastRang=settings.paliers.length?settings.paliers[settings.paliers.length-1].rang+1:2;
+  settings.paliers.push({rang:lastRang,pct:10});
+  renderPaliers();
+}
+function removePalier(i){settings.paliers.splice(i,1);renderPaliers();}
+
+async function savePaliers() {
+  await saveSettings();
+  toast('Paliers enregistrés !');
+  refreshAll();
+}
+
+function renderCreneaux() {
+  const cr=settings.creneaux||[];
+  document.getElementById('creneaux-list').innerHTML=cr.length?cr.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <span class="cours-pill">${c.jour} ${c.heure}</span>
+      <span style="flex:1;font-size:13px;color:var(--text-muted)">${c.label||''}</span>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="removeCreneau(${i})"><i class="ti ti-trash" style="color:var(--danger)"></i></button>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--text-faint);padding:8px 0">Aucun créneau défini.</div>';
+  // Populate select
+  const sel=document.getElementById('fc-creneau-pre');
+  if(sel){sel.innerHTML='<option value="">— Sélectionner —</option>'+cr.map(c=>`<option value="${c.jour}|${c.heure}|${c.label||''}">${c.jour} ${c.heure} ${c.label?'· '+c.label:''}</option>`).join('');}
+}
+
+function addCreneau() {
+  const jour=document.getElementById('new-cren-jour').value;
+  const heure=document.getElementById('new-cren-heure').value;
+  const label=document.getElementById('new-cren-label').value;
+  if(!jour||!heure) return;
+  if(!settings.creneaux) settings.creneaux=[];
+  settings.creneaux.push({jour,heure,label});
+  saveSettings(); renderCreneaux();
+  document.getElementById('new-cren-label').value='';
+}
+function removeCreneau(i){settings.creneaux.splice(i,1);saveSettings();renderCreneaux();}
+
+function fillCreneau() {
+  const val=document.getElementById('fc-creneau-pre').value;
+  if(!val) return;
+  const [jour,heure,label]=val.split('|');
+  document.getElementById('fc-jour').value=jour;
+  document.getElementById('fc-heure').value=heure;
+}
+
+async function saveSettings() {
+  const data={paliers:settings.paliers||[], creneaux:settings.creneaux||[], saison:settings.saison||'', createdAt:fbOps.serverTimestamp()};
+  if(settings._id){await fbOps.updateDoc(fbOps.doc(db,'settings',settings._id),data);}
+  else{const r=await fbOps.addDoc(window._col('settings'),data);settings._id=r.id;}
+}
+
+async function saveSaison(){settings.saison=document.getElementById('param-saison').value;await saveSettings();toast('Saison enregistrée !');}
+
+// ===== MODAL CAVALIER =====
+function setFormTab(tab,btn) {
+  ['identite','cours','tarif','urgence'].forEach(t=>document.getElementById('ft-'+t).style.display=t===tab?'':'none');
+  document.querySelectorAll('#mo-cav .tabbtn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+}
+
+function updateMontantBase(){
+  const f=document.getElementById('fc-formule').value;
+  if(f!=='custom') document.getElementById('fc-mbase').value=f;
+  updateTarifPreview();
+}
+
+function updateTarifPreview(){
+  const base=parseInt(document.getElementById('fc-mbase').value||0);
+  const remInd=parseInt(document.getElementById('fc-remise').value||0);
+  const famId=document.getElementById('fc-famille').value;
+  const fam=familles.find(f=>f.id===famId);
+  let remFamAuto=0, famMsg='';
+  if(fam){
+    const membresActuels=cavaliers.filter(c=>c.familleId===famId&&c.id!==editCavId);
+    const rang=membresActuels.length+2;
+    (settings.paliers||[]).forEach(p=>{if(rang>=p.rang&&p.pct>remFamAuto)remFamAuto=p.pct;});
+    const remFamEuro=Math.round(base*remFamAuto/100)+parseInt(fam.remise||0);
+    famMsg=`Remise famille : ${remFamAuto>0?`-${remFamAuto}% (−${Math.round(base*remFamAuto/100)}€)`:'—'} ${fam.remise>0?`+ −${fam.remise}€ manuel`:''}`;
+    document.getElementById('fam-remise-info').style.display=fam?'':'none';
+    document.getElementById('fam-remise-txt').textContent=famMsg;
+    const final=Math.max(0,base-remInd-remFamEuro);
+    document.getElementById('tarif-prev').textContent=final.toLocaleString('fr-FR')+' €';
+    document.getElementById('tarif-detail').textContent=`(${base}€ base${remInd>0?' − '+remInd+'€':''} ${remFamEuro>0?' − '+remFamEuro+'€ fam':''})`; return;
+  }
+  document.getElementById('fam-remise-info').style.display='none';
+  const final=Math.max(0,base-remInd);
+  document.getElementById('tarif-prev').textContent=final.toLocaleString('fr-FR')+' €';
+  document.getElementById('tarif-detail').textContent=remInd>0?`(${base}€ − ${remInd}€ remise)`:'';
+}
+
+function populateFamSel(){
+  const sel=document.getElementById('fc-famille');if(!sel)return;
+  const v=sel.value;
+  sel.innerHTML='<option value="">— Aucune —</option>'+familles.map(f=>`<option value="${f.id}">${f.nom}</option>`).join('');
+  sel.value=v;
+}
+
+function openCavModal(){
+  editCavId=null;
+  document.getElementById('mo-cav-title').textContent='Nouvel inscrit';
+  document.getElementById('btn-del-cav').style.display='none';
+  ['fc-nom','fc-prenom','fc-email','fc-tel1','fc-tel2','fc-adresse','fc-cours-notes','fc-pay-notes','fc-urg-nom','fc-urg-prenom','fc-urg-tel','fc-urg-lien','fc-remise-r'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('fc-ddn').value='';
+  document.getElementById('fc-remise').value='0';
+  document.getElementById('fc-formule').value='650';
+  document.getElementById('fc-mbase').value='650';
+  document.getElementById('fc-licence').value='25';
+  document.getElementById('fc-mode').value='cheque';
+  document.getElementById('fc-statut').value='impayé';
+  document.getElementById('fc-famille').value='';
+  document.getElementById('fc-saison').value=settings.saison||'';
+  document.getElementById('fc-jour').value='';
+  document.getElementById('fc-heure').value='18:00';
+  document.getElementById('fc-niveau').value='Galop 1';
+  updateTarifPreview();
+  setFormTab('identite',document.querySelector('#mo-cav .tabbtn'));
+  document.getElementById('mo-cav').classList.add('open');
+}
+
+function openEditCav(id){
+  const c=cavaliers.find(x=>x.id===id);if(!c)return;
+  editCavId=id;
+  document.getElementById('mo-cav-title').textContent=`Modifier — ${c.prenom} ${c.nom}`;
+  document.getElementById('btn-del-cav').style.display='';
+  const set=(el,v)=>{const e=document.getElementById(el);if(e)e.value=v||'';};
+  set('fc-nom',c.nom);set('fc-prenom',c.prenom);set('fc-ddn',c.ddn);set('fc-email',c.email);
+  set('fc-tel1',c.tel1);set('fc-tel2',c.tel2);set('fc-adresse',c.adresse);
+  set('fc-cours-notes',c.coursNotes);set('fc-pay-notes',c.payNotes);set('fc-saison',c.saison);
+  set('fc-remise',c.remise||'0');set('fc-remise-r',c.remiseRaison);
+  set('fc-urg-nom',c.urgNom);set('fc-urg-prenom',c.urgPrenom);set('fc-urg-tel',c.urgTel);set('fc-urg-lien',c.urgLien);
+  document.getElementById('fc-niveau').value=c.niveau||'Galop 1';
+  document.getElementById('fc-jour').value=c.jour||'';
+  document.getElementById('fc-heure').value=c.heure||'18:00';
+  document.getElementById('fc-formule').value=c.formule||'650';
+  document.getElementById('fc-mbase').value=c.montantBase||c.formule||'650';
+  document.getElementById('fc-licence').value=c.licence||'25';
+  document.getElementById('fc-mode').value=c.mode||'cheque';
+  document.getElementById('fc-statut').value=c.statut||'impayé';
+  document.getElementById('fc-famille').value=c.familleId||'';
+  updateTarifPreview();
+  setFormTab('identite',document.querySelector('#mo-cav .tabbtn'));
+  document.getElementById('mo-cav').classList.add('open');
+}
+
+function closeCavModal(){document.getElementById('mo-cav').classList.remove('open');editCavId=null;}
+
+async function saveCav(){
+  const nom=document.getElementById('fc-nom').value.trim();
+  const prenom=document.getElementById('fc-prenom').value.trim();
+  if(!nom||!prenom){toast('Nom et prénom requis','err');return;}
+  const data={
+    nom,prenom,
+    ddn:document.getElementById('fc-ddn').value,
+    email:document.getElementById('fc-email').value,
+    tel1:document.getElementById('fc-tel1').value,
+    tel2:document.getElementById('fc-tel2').value,
+    adresse:document.getElementById('fc-adresse').value,
+    niveau:document.getElementById('fc-niveau').value,
+    jour:document.getElementById('fc-jour').value,
+    heure:document.getElementById('fc-heure').value,
+    coursNotes:document.getElementById('fc-cours-notes').value,
+    saison:document.getElementById('fc-saison').value,
+    formule:document.getElementById('fc-formule').value,
+    montantBase:parseInt(document.getElementById('fc-mbase').value||650),
+    remise:parseInt(document.getElementById('fc-remise').value||0),
+    remiseRaison:document.getElementById('fc-remise-r').value,
+    licence:document.getElementById('fc-licence').value,
+    mode:document.getElementById('fc-mode').value,
+    statut:document.getElementById('fc-statut').value,
+    payNotes:document.getElementById('fc-pay-notes').value,
+    familleId:document.getElementById('fc-famille').value||null,
+    urgNom:document.getElementById('fc-urg-nom').value,
+    urgPrenom:document.getElementById('fc-urg-prenom').value,
+    urgTel:document.getElementById('fc-urg-tel').value,
+    urgLien:document.getElementById('fc-urg-lien').value,
+  };
+  try{
+    if(editCavId){await fbOps.updateDoc(fbOps.doc(db,'cavaliers',editCavId),data);toast('Cavalier mis à jour !');}
+    else{data.createdAt=fbOps.serverTimestamp();data.encaissements=[];await fbOps.addDoc(window._col('cavaliers'),data);toast('Cavalier ajouté !');}
+    closeCavModal();
+  }catch(e){toast('Erreur : '+e.message,'err');}
+}
+
+async function delCav(){
+  if(!editCavId||!confirm('Supprimer ce cavalier ?'))return;
+  await fbOps.deleteDoc(fbOps.doc(db,'cavaliers',editCavId));
+  toast('Cavalier supprimé');closeCavModal();
+}
+
+// ===== MODAL FAMILLE =====
+function openFamModal(){
+  editFamId=null;
+  document.getElementById('mo-fam-title').textContent='Nouvelle famille';
+  document.getElementById('btn-del-fam').style.display='none';
+  ['ff-nom','ff-contact','ff-tel','ff-email','ff-notes','ff-remise-r'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('ff-remise').value='0';
+  document.getElementById('mo-fam').classList.add('open');
+}
+function openEditFam(id){
+  const f=familles.find(x=>x.id===id);if(!f)return;
+  editFamId=id;
+  document.getElementById('mo-fam-title').textContent='Modifier — '+f.nom;
+  document.getElementById('btn-del-fam').style.display='';
+  const set=(el,v)=>{const e=document.getElementById(el);if(e)e.value=v||'';};
+  set('ff-nom',f.nom);set('ff-contact',f.contact);set('ff-tel',f.tel);set('ff-email',f.email);set('ff-notes',f.notes);set('ff-remise-r',f.remiseRaison);
+  document.getElementById('ff-remise').value=f.remise||'0';
+  document.getElementById('mo-fam').classList.add('open');
+}
+function closeFamModal(){document.getElementById('mo-fam').classList.remove('open');editFamId=null;}
+async function saveFam(){
+  const nom=document.getElementById('ff-nom').value.trim();
+  if(!nom){toast('Nom requis','err');return;}
+  const data={nom,contact:document.getElementById('ff-contact').value,tel:document.getElementById('ff-tel').value,email:document.getElementById('ff-email').value,remise:parseInt(document.getElementById('ff-remise').value||0),remiseRaison:document.getElementById('ff-remise-r').value,notes:document.getElementById('ff-notes').value};
+  try{
+    if(editFamId){await fbOps.updateDoc(fbOps.doc(db,'familles',editFamId),data);toast('Famille mise à jour !');}
+    else{data.createdAt=fbOps.serverTimestamp();await fbOps.addDoc(window._col('familles'),data);toast('Famille créée !');}
+    closeFamModal();
+  }catch(e){toast('Erreur : '+e.message,'err');}
+}
+async function delFam(){
+  if(!editFamId||!confirm('Supprimer ?'))return;
+  await fbOps.deleteDoc(fbOps.doc(db,'familles',editFamId));
+  toast('Famille supprimée');closeFamModal();
+}
+
+// ===== ENCAISSEMENTS =====
+function openEncModal(cavId, idx){
+  encCavId=cavId; encIdx=idx;
+  const c=cavaliers.find(x=>x.id===cavId);
+  document.getElementById('mo-enc-title').textContent=idx!==null&&idx!==undefined?`Modifier encaissement — ${c?.prenom} ${c?.nom}`:`Ajouter encaissement — ${c?.prenom} ${c?.nom}`;
+  document.getElementById('btn-del-enc').style.display=idx!==null&&idx!==undefined?'':'none';
+  if(idx!==null&&idx!==undefined&&c?.encaissements?.[idx]){
+    const e=c.encaissements[idx];
+    document.getElementById('enc-montant').value=e.montant||'';
+    document.getElementById('enc-date').value=e.date||'';
+    document.getElementById('enc-mode').value=e.mode||'cheque';
+    document.getElementById('enc-statut').value=e.statut||'encaisse';
+    document.getElementById('enc-ref').value=e.ref||'';
+    document.getElementById('enc-note').value=e.note||'';
+  } else {
+    document.getElementById('enc-montant').value=getReste(c)||'';
+    document.getElementById('enc-date').value=today();
+    document.getElementById('enc-mode').value=c?.mode||'cheque';
+    document.getElementById('enc-statut').value='encaisse';
+    document.getElementById('enc-ref').value='';
+    document.getElementById('enc-note').value='';
+  }
+  document.getElementById('mo-enc').classList.add('open');
+}
+function closeEncModal(){document.getElementById('mo-enc').classList.remove('open');encCavId=null;encIdx=null;}
+
+async function saveEnc(){
+  const c=cavaliers.find(x=>x.id===encCavId);if(!c)return;
+  const montant=parseFloat(document.getElementById('enc-montant').value||0);
+  if(!montant){toast('Montant requis','err');return;}
+  const enc={montant,date:document.getElementById('enc-date').value,mode:document.getElementById('enc-mode').value,statut:document.getElementById('enc-statut').value,ref:document.getElementById('enc-ref').value,note:document.getElementById('enc-note').value};
+  const encs=[...(c.encaissements||[])];
+  if(encIdx!==null&&encIdx!==undefined) encs[encIdx]=enc;
+  else encs.push(enc);
+  const newStatut=computeStatutFromEncs(encs,getMontantDu(c));
+  await fbOps.updateDoc(fbOps.doc(db,'cavaliers',encCavId),{encaissements:encs,statut:newStatut});
+  toast('Encaissement enregistré !');closeEncModal();
+}
+
+async function delEnc(){
+  const c=cavaliers.find(x=>x.id===encCavId);if(!c||encIdx===null)return;
+  if(!confirm('Supprimer cet encaissement ?'))return;
+  const encs=[...(c.encaissements||[])];
+  encs.splice(encIdx,1);
+  const newStatut=computeStatutFromEncs(encs,getMontantDu(c));
+  await fbOps.updateDoc(fbOps.doc(db,'cavaliers',encCavId),{encaissements:encs,statut:newStatut});
+  toast('Encaissement supprimé');closeEncModal();
+}
+
+async function encaisserVite(cavId,idx){
+  const c=cavaliers.find(x=>x.id===cavId);if(!c)return;
+  const encs=[...(c.encaissements||[])];
+  if(encs[idx]) encs[idx]={...encs[idx],statut:'encaisse',date:encs[idx].date||today()};
+  const newStatut=computeStatutFromEncs(encs,getMontantDu(c));
+  await fbOps.updateDoc(fbOps.doc(db,'cavaliers',cavId),{encaissements:encs,statut:newStatut});
+  toast('Encaissé ✓');
+}
+
+function computeStatutFromEncs(encs,du){
+  const enc=encs.filter(e=>e.statut==='encaisse').reduce((s,e)=>s+Number(e.montant||0),0);
+  if(enc>=du&&du>0)return 'ok';
+  if(enc>0)return 'partiel';
+  return 'impayé';
+}
+
+// ===== DETAIL =====
+function openDetail(id){
+  const c=cavaliers.find(x=>x.id===id);if(!c)return;
+  const fam=familles.find(f=>f.id===c.familleId);
+  const du=getMontantDu(c),enc=getEncaisse(c),reste=getReste(c);
+  document.getElementById('det-name').textContent=`${c.prenom} ${c.nom}`;
+  document.getElementById('det-edit-btn').onclick=()=>{closeDetail();openEditCav(id);};
+  document.getElementById('det-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+      <div class="av av-lg">${ini(c.nom,c.prenom)}</div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:600">${c.prenom} ${c.nom}</div>
+      <div style="font-size:13px;color:var(--text-muted)">${c.niveau||'—'} ${fam?'· '+fam.nom:''}</div></div>
+      ${statBadge(c.statut)}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:12px">
+      <div><span style="font-size:11px;color:var(--text-faint);display:block">Email</span>${c.email||'—'}</div>
+      <div><span style="font-size:11px;color:var(--text-faint);display:block">Téléphone</span>${c.tel1||'—'}</div>
+      <div><span style="font-size:11px;color:var(--text-faint);display:block">Naissance</span>${fmt(c.ddn)}${getAge(c.ddn)!==null?' ('+getAge(c.ddn)+' ans)':''}</div>
+      <div><span style="font-size:11px;color:var(--text-faint);display:block">Saison</span>${c.saison||'—'}</div>
+    </div>
+    <div style="background:var(--info-bg);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <i class="ti ti-calendar" style="color:var(--info);font-size:18px"></i>
+      <div><div style="font-size:13px;font-weight:500">${c.jour||'—'} ${c.heure||''}</div>
+      <div style="font-size:12px;color:var(--info)">${c.niveau||''} ${c.coursNotes?'· '+c.coursNotes:''}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:var(--bg);border-radius:var(--radius-sm);padding:9px;text-align:center">
+        <div style="font-size:11px;color:var(--text-faint)">Dû</div><div style="font-weight:600;font-size:14px">${fmtM(du)}</div>
+      </div>
+      <div style="background:var(--success-bg);border-radius:var(--radius-sm);padding:9px;text-align:center">
+        <div style="font-size:11px;color:var(--success)">Encaissé</div><div style="font-weight:600;font-size:14px;color:var(--success)">${fmtM(enc)}</div>
+      </div>
+      <div style="background:${reste>0?'var(--danger-bg)':'var(--success-bg)'};border-radius:var(--radius-sm);padding:9px;text-align:center">
+        <div style="font-size:11px;color:${reste>0?'var(--danger)':'var(--success)'}">${reste>0?'Reste':'Solde'}</div><div style="font-weight:600;font-size:14px;color:${reste>0?'var(--danger)':'var(--success)'}">${fmtM(reste)}</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;flex:1">Encaissements (${(c.encaissements||[]).length})</div>
+      <button class="btn btn-primary btn-sm" onclick="closeDetail();openEncModal('${c.id}',null)"><i class="ti ti-plus"></i> Ajouter</button>
+    </div>
+    <div class="enc-list">${(c.encaissements||[]).length?(c.encaissements||[]).map((e,i)=>`
+      <div class="enc-row ${e.statut==='encaisse'?'encaisse':e.statut==='retard'||e.statut==='rejete'?'retard':e.statut==='en-attente'?'en-attente':''}">
+        ${modeBadge(e.mode)}
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${fmtM(e.montant)}</div>
+        <div style="font-size:11px;color:var(--text-faint)">${fmt(e.date)} ${e.ref?'· '+e.ref:''} ${e.note?'· '+e.note:''}</div></div>
+        ${encStatBadge(e.statut)}
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="closeDetail();openEncModal('${c.id}',${i})"><i class="ti ti-edit"></i></button>
+      </div>`).join(''):'<div style="font-size:13px;color:var(--text-faint);padding:6px 0">Aucun encaissement saisi.</div>'}
+    </div>
+    ${c.urgNom||c.urgTel?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">Contact urgence</div>
+      <div style="font-size:13px">${c.urgPrenom||''} ${c.urgNom||''} · ${c.urgTel||'—'} · ${c.urgLien||'—'}</div>
+    </div>`:''}
+  `;
+  document.getElementById('mo-detail').classList.add('open');
+}
+function closeDetail(){document.getElementById('mo-detail').classList.remove('open');}
+
+// ===== AI =====
+async function sendAI(){
+  const input=document.getElementById('ai-in');
+  const q=input.value.trim();if(!q)return;
+  input.value='';
+  const msgs=document.getElementById('ai-msgs');
+  msgs.innerHTML+=`<div style="padding:9px 13px;background:var(--pink-light);border-left:2px solid var(--pink);border-radius:var(--radius);font-size:13px;line-height:1.6">${q}</div>`;
+  msgs.innerHTML+=`<div id="ai-loading" style="padding:9px 13px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-faint)"><i class="ti ti-loader spin"></i> Analyse...</div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  const data=cavaliers.map(c=>({nom:c.nom,prenom:c.prenom,age:getAge(c.ddn),niveau:c.niveau,jour:c.jour,heure:c.heure,formule:c.formule,du:getMontantDu(c),encaisse:getEncaisse(c),reste:getReste(c),statut:c.statut,mode:c.mode,famille:familles.find(f=>f.id===c.familleId)?.nom||null,encaissements:(c.encaissements||[]).map(e=>({montant:e.montant,date:e.date,mode:e.mode,statut:e.statut,ref:e.ref}))}));
+  const famData=familles.map(f=>({nom:f.nom,remise:f.remise,membres:cavaliers.filter(c=>c.familleId===f.id).length}));
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:`Tu es l'assistant des Écuries des Marais (Décines, Rhône). Tu réponds en français, concis et structuré. Cavaliers: ${JSON.stringify(data)}. Familles: ${JSON.stringify(famData)}. Date: ${today()}.`,messages:[{role:'user',content:q}]})});
+    const d=await r.json();
+    document.getElementById('ai-loading')?.remove();
+    msgs.innerHTML+=`<div style="padding:9px 13px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;line-height:1.6">${(d.content?.[0]?.text||'Erreur').replace(/\n/g,'<br>')}</div>`;
+  }catch(e){document.getElementById('ai-loading')?.remove();msgs.innerHTML+=`<div style="padding:9px 13px;background:var(--danger-bg);border-radius:var(--radius);font-size:13px;color:var(--danger)">Erreur de connexion.</div>`;}
+  msgs.scrollTop=msgs.scrollHeight;
+}
+function askAI(q){nav('ai',document.querySelectorAll('.nav-btn')[8]);document.getElementById('ai-in').value=q;sendAI();}
+
+// ===== TOAST =====
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`toast toast-${type} show`;
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
